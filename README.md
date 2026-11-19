@@ -2,6 +2,22 @@
 
 这是一个独立的小服务，用于查看 Unitree G1D 机器人底盘侧的思岚/SLAMWARE 传感器数据，并在 SLAM 地图上点选航点后交给 Slamware 底层导航。
 
+> ## 🧭 核心功能：G1D 重定位与导航
+>
+> 本服务的主线是 **G1D 底盘在已有地图上的重定位 + 航点导航**，一般按下面四步使用：
+>
+> | 步骤 | 做什么 | 接口 |
+> |---|---|---|
+> | ① 加载地图 | 把保存的 `.stcm` 地图（如 `八维通实验室`、`研发核心区域`）下发给 Slamware | `POST /api/mapping/load` `{"name": "<地图名>"}` |
+> | ② 保存锚点 | 机器人停在已知位置时，把当前位姿存为重定位锚点（`data/relocalization_anchor.json`） | `POST /api/relocalization/save_anchor` |
+> | ③ 重定位 | 以锚点为初值，在半径内搜索匹配（默认 0.6 m / 8 s / `NO_MOVE`） | `POST /api/relocalization/run` |
+> | ④ 导航 | 地图选点或点位库 → 动作链执行，带 yaw 到位判定（180 mm / 4°） | `POST /api/navigation/start` · `/cancel` |
+>
+> - 查看重定位状态：`GET /api/relocalization/status`
+> - 重定位参数：`--relocalization-search-radius-m`、`--relocalization-max-time-ms`、`--relocalization-movement {NO_MOVE,ROTATE_ONLY,ANY}`
+> - **导航前先确认重定位成功**；`localization_quality` 过低默认只警告，可用 `--min-localization-quality` 改为强制拦截。
+> - 详细说明见下文 [地图选点导航](#地图选点导航) 与 [导航 API](#导航-api)。
+
 当前支持：
 
 - 激光雷达扫描
@@ -9,7 +25,8 @@
 - 超声波/碰撞传感器
 - `/ele_clouds` 稀疏点云
 - 当前 ROS 状态摘要
-- 地图点选航点、路径预览、开始/停止 Slamware 导航
+- **地图加载与重定位**（锚点 + 半径搜索）
+- **地图点选航点、路径预览、开始/停止 Slamware 导航**
 
 服务默认监听 `0.0.0.0:18083`，机器人和本地电脑在同一网络时，可以直接通过机器人 IP 打开网页。
 
